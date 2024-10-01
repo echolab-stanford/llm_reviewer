@@ -21,6 +21,17 @@ def standardize_headers(df: pd.DataFrame, func=None) -> pd.DataFrame:
     return df
 
 
+def normalize_affiliation(affiliation):
+    if len(affiliation) == 0:
+        return None
+
+    normalized = []
+    for item in affiliation:
+        if isinstance(item, dict) and "name" in item:
+            normalized.append(item["name"])
+    return normalized
+
+
 def flatten_author(df: pd.DataFrame) -> pd.DataFrame:
     # Explore author columns to max 4 (et.al. limit)
     df_exp = df.explode("author")
@@ -31,11 +42,19 @@ def flatten_author(df: pd.DataFrame) -> pd.DataFrame:
 
     # Make it wide
     df_auth = df_auth.pivot(
-        index="doi", columns="auth_num", values=["given", "family", "affiliation"]
+        index="doi",
+        columns="auth_num",
+        values=["given", "family", "affiliation"],
     ).reset_index()
 
     # Fancy rename to get author_1, author_2, etc
     df_auth.columns = [f"{a}_{b}" for a, b in df_auth.columns]
+
+    # Normalize affiliation to only get names in a list. Make life easier to DuckDB
+    affiliation_cols = df_auth.filter(like="affiliation_")
+    df_auth[affiliation_cols.columns] = affiliation_cols.applymap(
+        normalize_affiliation
+    )
 
     # Merge stuff
     df = df_auth.merge(df, left_on="doi_", right_on="doi")
@@ -65,7 +84,9 @@ def json_to_parquet(file_path: str, output_dir: str) -> None:
         file_path = Path(file_path)
 
     # Process only if the file doesn't exists
-    save_path = os.path.join(output_dir, f"{file_path.stem.split('.')[0]}.parquet")
+    save_path = os.path.join(
+        output_dir, f"{file_path.stem.split('.')[0]}.parquet"
+    )
     if not os.path.exists(save_path):
         try:
             df = pd.read_json(file_path)
@@ -100,7 +121,9 @@ def process_files_in_parallel(json_files: list, output_dir: str) -> None:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok="ignore")
 
-    tasks = [dask.delayed(json_to_parquet)(file, output_dir) for file in json_files]
+    tasks = [
+        dask.delayed(json_to_parquet)(file, output_dir) for file in json_files
+    ]
 
     dask.compute(*tasks)
 
@@ -112,7 +135,8 @@ def process_files_in_parallel(json_files: list, output_dir: str) -> None:
 if __name__ == "__main__":
     # Define input arguments
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--path_json_files",
