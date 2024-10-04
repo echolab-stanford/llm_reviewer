@@ -14,6 +14,20 @@ from pathlib import Path
 
 
 def standardize_headers(df: pd.DataFrame, func=None) -> pd.DataFrame:
+    """Helper function to standarize column names for an arbitrary DataFrame
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to be standarized
+    func : callable, optional
+        A function to apply to the DataFrame. The default is None.
+
+    Returns
+    -------
+    pd.DataFrame
+    """
+
     df.columns = df.columns.str.replace("-", "_").str.lower()
     if func:
         df = df.apply(func)
@@ -21,7 +35,23 @@ def standardize_headers(df: pd.DataFrame, func=None) -> pd.DataFrame:
     return df
 
 
-def normalize_affiliation(affiliation):
+def normalize_affiliation(affiliation: list | pd.Series) -> list:
+    """Extract author's affiliation from Crossref JSON raw data
+
+    The affiliation field in the Crossref JSON raw data is a list of dictionaries
+    that is hard to parse in DuckDB. This function extracts all of author's
+    affiliation and returns a list with all the names with the same order. This
+    function is meant to be map to a DataFrame column.
+
+    Parameters
+    ----------
+    affiliation : list or pd.Series
+        List of dictionaries with affiliation data
+
+    Returns
+    -------
+        List with flattened affiliations
+    """
     if len(affiliation) == 0:
         return None
 
@@ -33,6 +63,33 @@ def normalize_affiliation(affiliation):
 
 
 def flatten_author(df: pd.DataFrame) -> pd.DataFrame:
+    """Extract flattened author data from a list of nested dictionaries
+
+    This function takes the raw Crossref data and extracts the author data that
+    is stored as a nested dictionary. This function extracts the author data and
+    creates columns with the author dictionary elements: given, family, and
+    affiliation. If the paper has more than one author, then the function will
+    return `given_1`, `given_2`, `family_1`, `family_2`, etc. If the paper has
+    more than 4 papers, then the function will only return these.
+
+    Notice this function applied the `affiliation_normalization` function.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with the raw Crossref data
+
+    Note:
+    ----
+     - Ideally we will add a `et_al` column, so far we just ignore it.
+     - Some of the Crossref papers have up to 60 authors, thus we decide to
+     cut that.
+
+    Returns
+    -------
+    pd.DataFrame
+
+    """
     # Explore author columns to max 4 (et.al. limit)
     df_exp = df.explode("author")
 
@@ -64,6 +121,29 @@ def flatten_author(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def json_to_parquet(file_path: str, output_dir: str) -> None:
+    """Convert raw Crossref JSON data to Parquet
+
+    This function reads the complete Crossref JSON data files and just takes
+    the columns that are useful for the analysis. The function also flattens
+    author and affiliation data and extract data from arrays to make processing
+    in DuckDB easier. This function saves all files in Parquet format keeping
+    the same name, but adding the `cleaned` particle to the original name.
+
+    This function van be run individually, but is meant to be used in parallel
+    using the `process_files_in_parallel` function.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the JSON file
+    output_dir : str
+        Dir path to save the Parquet file.
+
+    Returns
+    -------
+    None
+
+    """
     subset_cols = [
         "DOI",
         "title",
@@ -116,7 +196,43 @@ def json_to_parquet(file_path: str, output_dir: str) -> None:
     return None
 
 
-def process_files_in_parallel(json_files: list, output_dir: str) -> None:
+def process_files_in_parallel(
+    json_files: list[Path | str], output_dir: str
+) -> None:
+    """Apply the `json_to_parquet` function to all JSON files in parallel using
+    Dask
+
+    This function takes a list of JSON files and applies the `json_to_parquet`
+
+    Parameters
+    ----------
+    json_files : list
+        List of JSON files as pathlib.Path objects to be processed. If string
+        is passed, then it will be transformed to a Path object.
+
+    output_dir : str
+        Path to save the Parquet files.
+
+    Note
+    ----
+    This function uses Dask to parallelize the process. It's important to have
+    a `dask.distributed.Client` already instantiated before running this
+    function, otherwise the delayed objects won't be processed. The function
+    will search for a client in the global scope and raise an error if it's not
+    there.
+
+    Returns
+    -------
+    None
+    """
+
+    # If a client is not found then raise an error
+    if dask.distributed.client._get_global_client() is None:
+        raise ValueError(
+            "A Dask client is not found. Please instantiate a Dask client "
+            "before running this function."
+        )
+
     # Create saving dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok="ignore")
