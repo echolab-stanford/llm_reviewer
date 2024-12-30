@@ -1,6 +1,6 @@
 # LLM Reviewer 📚🤖
 
-<img align="right" src="figures/cute_logo.svg" alt="What DALL-E thinks is an appropriate library logo" width=400 height=500 />
+<img align="right" src="figures/cute_logo.svg" alt="What DALL-E thinks is an appropriate library logo" width=200 height=250 />
 
 This library is an attempt at building a semi-automatic system to explore scientific literature. We want to achieve several goals: 
  - *Literature recommendation based on paper embeddings*: This can do vanilla topic-based, but also methods-based (i.e. what is the *causal* evidence of adaptation to the effects of temperature on mortality).
@@ -46,5 +46,18 @@ The main point of interaction is a command-line tool:
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
+## How to test
+
+To run the tests, you need to have `pytest` installed. You can install it using:
+
+```bash
+pip install pytest
+```
+
+Then, you can run the tests using:
+
+```bash
+pytest
+```
 
 [1]: https://www.crossref.org/
