@@ -1,6 +1,7 @@
 # LLM Reviewer 📚🤖
 
-<img align="right" src="figures/logo_cute.png alt="image" />
+<img align="right" src="figures/logo_cute.png" alt="image" />
+
 This library is an attempt at building a semi-automatic system to explore scientific literature. We want to achieve several goals: 
  - *Literature recommendation based on paper embeddings*: This can do vanilla topic-based, but also methods-based (i.e. what is the *causal* evidence of adaptation to the effects of temperature on mortality).
  - *QA Tasks*: Given a body of literature as a sequence of PDFs, what do we know about a particular topic? What is the summary of the evidence? 
