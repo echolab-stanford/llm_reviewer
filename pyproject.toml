@@ -1,14 +1,37 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
+name = "adaptation_reviewer"
 authors = [
-  {name = "Iván Higuera-Mendieta", email = "ihigueme@stanford.ed"},
+  {name = "Iván Higuera-Mendieta", email = "ihigueme@stanford.edu"},
   {name = "Marshall Burke", email = "mburke@stanford.edu"},
 ]
 dynamic = ["version"]
-name = "adaptation-reviwer"
 readme = "README.md"
 license = {text = "MIT License"}
-requires-python = ">= 3.11"
+requires-python = "> 3.11"
+
+dependencies = [
+    "typer",
+    "joblib",
+    "pyarryow",
+    "fastparquet",
+    "pandas",
+    "duckdb,
+    "pytorch",
+    "sentence-transformers",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "mypy",
+    "black",
+    "ruff",
+    "typer-cli",
+]
+doc = ["sphinx"]
+
+[tool.setuptools.packages.find]
+include = ["adaptation_reviewer"]
+
+[project.scripts]
+adaptreview = "adaptation_reviewer.cli:app"
