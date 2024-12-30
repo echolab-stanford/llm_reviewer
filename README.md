@@ -1,6 +1,6 @@
 # LLM Reviewer 📚🤖
 
-<img align="right" src="figures/logo_cute.png" alt="image" />
+<img align="right" src="figures/cute_logo.svg" alt="What DALL-E thinks is an appropriate library logo" width=400 height=500 />
 
 This library is an attempt at building a semi-automatic system to explore scientific literature. We want to achieve several goals: 
  - *Literature recommendation based on paper embeddings*: This can do vanilla topic-based, but also methods-based (i.e. what is the *causal* evidence of adaptation to the effects of temperature on mortality).
