@@ -1,6 +1,7 @@
 import logging
 from typing import List
 import numpy as np
+import pandas as pd
 import duckdb
 from sentence_transformers import SentenceTransformer
 
@@ -29,8 +30,13 @@ def create_connection(db_name: str = None) -> duckdb.duckdb.DuckDBPyConnection:
 
 
 def create_table(
-    path_parquet: str, keyords: str | List, table_name: str, con=None, **kwargs
-) -> None:
+    path_parquet: str,
+    keyords: str | List,
+    table_name: str,
+    con=None,
+    create_table: bool = True,
+    **kwargs,
+) -> None | pd.DataFrame:
     """Create a SQL filtered table by keywords in the abstract
 
     This query creates a table with a sepcific name and using keywords in the
@@ -60,16 +66,7 @@ def create_table(
     else:
         keyords = f"regexp_matches(abstract, '{keyords}', 'i')"
 
-    # Create table
-    con.execute(
-        f"""
-        DROP TABLE IF EXISTS {table_name};
-        """
-    )
-
     query = f"""
-        drop table if exists {table_name};
-        CREATE TABLE {table_name} AS (
         SELECT 
         LEFT(sha256(doi), 10) AS uuid,
         doi,
@@ -82,17 +79,31 @@ def create_table(
                     regexp_replace(abstract, 'Abstract', '', 'g'),
                     '<[^>]+>', '', 'g'
                 ),
-                '\n', ' ', 'g' -- Replace newline characters with a space globally
+                '\n', ' ', 'g'
             )
             ) AS abstract,
         FROM read_parquet('{path_parquet}/*.parquet', union_by_name=True)
         WHERE {keyords}
         AND type = 'journal-article'
-        AND abstract IS NOT NULL);
+        AND abstract IS NOT NULL
+        AND family_1 IS NOT NULL
         """
-    con.execute(query)
 
-    logger.debug(f"SQL Table created: {table_name}")
+    if create_table:
+        # Create table
+        con.execute(
+            f"""
+            DROP TABLE IF EXISTS {table_name};
+            """
+        )
+
+        query = f"CREATE TABLE {table_name} AS ({query});"
+
+        con.execute(query)
+        logger.debug(f"SQL Table created: {table_name}")
+    else:
+        query = con.sql(query)
+        return query.to_df()
 
     return None
 
@@ -101,6 +112,8 @@ def create_embeddings_abstracts(
     model: str,
     table_name: str,
     con: None | duckdb.duckdb.DuckDBPyConnection = None,
+    key: str = "uuid",
+    abstract_key: str = "abstract",
     **kwargs,
 ) -> None:
     """Create embedding table in DuckDB dataset
@@ -126,7 +139,8 @@ def create_embeddings_abstracts(
 
     abstracts = con.sql(
         f"""
-        SELECT uuid, abstract FROM {table_name}
+        SELECT {key}, {abstract_key} FROM {table_name}
+        where {abstract_key} IS NOT NULL
         """
     ).to_df()
 

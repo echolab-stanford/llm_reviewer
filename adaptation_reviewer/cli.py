@@ -1,18 +1,19 @@
 import logging
 from pathlib import Path
 from typing import Tuple
-from typing_extensions import Annotated
 
 import typer
+import pandas as pd
+from typing_extensions import Annotated
 
+from adaptation_reviewer.download import download_paper
+from adaptation_reviewer.pbar import progress_bar
 from adaptation_reviewer.process import (
     create_connection,
     create_embeddings_abstracts,
     create_table,
 )
 from adaptation_reviewer.transform import generate_parquet_from_list
-from adaptation_reviewer.download import download_paper
-from adaptation_reviewer.pbar import progress_bar
 
 logging.basicConfig(
     level=logging.INFO,
@@ -91,16 +92,45 @@ def create_db(
 
 @app.command()
 def embed_abstracts(
-    db_name: str = typer.Argument(..., help="Name of the database"),
+    db_name: str = typer.Argument(
+        ..., help="Name of the database or file to embed"
+    ),
     table_name: str = typer.Option("papers", help="Table in DB to embed"),
     model: str = typer.Option("all-mpnet-base-v1", help="Name of the model"),
+    key: str = typer.Option(
+        "uuid", help="Column to use as paper unique identifier"
+    ),
+    abstract_key: str = typer.Option("abstract", help="Column with abstracts"),
+    csv_file: str = typer.Option(
+        None, help="CSV file to embed. Optional if data not in DB"
+    ),
 ) -> None:
     """
     Use a LLM to embed the abstracts of DOI records the database
     """
     con = create_connection(db_name=db_name)
 
-    create_embeddings_abstracts(model=model, table_name=table_name, con=con)
+    if csv_file is not None:
+        df = pd.read_csv(csv_file)
+
+        # Parse column names to be lowercase and replace spaces with underscores
+        df.columns = df.columns.str.lower().str.replace(" ", "_")
+        key = key.lower()
+        abstract_key = abstract_key.lower()
+
+        df.rename(columns={key: "uuid", abstract_key: "abstract"}, inplace=True)
+
+        con.sql(
+            f"DROP TABLE {table_name}; CREATE TABLE {table_name} AS (SELECT * FROM df)",
+        )
+
+    create_embeddings_abstracts(
+        model=model,
+        table_name=table_name,
+        key="uuid",
+        abstract_key="abstract",
+        con=con,
+    )
 
     return None
 
